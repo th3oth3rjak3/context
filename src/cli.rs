@@ -10,11 +10,11 @@ fn long_about() -> String {
 #[command(name = "context", version, about = "AI Context Generator", long_about = long_about())]
 pub struct Cli {
     #[command(subcommand)]
-    pub command: Option<Command>,
+    pub command: CliCommand,
 }
 
 #[derive(Subcommand)]
-pub enum Command {
+pub enum CliCommand {
     /// Initialize a new context configuration.
     Init {
         #[arg(value_name = "project-directory", default_value = ".")]
