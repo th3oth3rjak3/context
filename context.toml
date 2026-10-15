@@ -1,0 +1,3 @@
+output_kind = "md"
+output_dir = "./context"
+include_file_names = true

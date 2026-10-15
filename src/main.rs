@@ -6,6 +6,7 @@ use clap::Parser;
 
 pub mod cli;
 pub mod commands;
+pub mod configuration;
 
 fn main() {
     let cli = Cli::parse();

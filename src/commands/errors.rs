@@ -1,4 +1,13 @@
+use std::{io, path::PathBuf};
+
 use thiserror::Error;
 
-#[derive(Debug, Clone, Error)]
-pub enum CommandError {}
+#[derive(Debug, Error)]
+pub enum CommandError {
+    #[error("Failed to load configuration for context '{path}'\nReason: {source}")]
+    LoadConfiguration {
+        path: PathBuf,
+        #[source]
+        source: io::Error,
+    },
+}
