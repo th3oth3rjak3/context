@@ -7,6 +7,8 @@ pub struct ContextConfiguration {
     pub kind: ContextOutputKind,
     pub output: PathBuf,
     pub include_file_names: bool,
+    pub excluded_filetypes: Vec<String>,
+    pub excluded_directories: Vec<PathBuf>,
 }
 
 impl ContextConfiguration {
@@ -15,9 +17,18 @@ impl ContextConfiguration {
         let output = self.output.display();
         let include_file_names = self.include_file_names;
 
-        format!(
+        let mut raw_config = String::new();
+
+        let header_row = format!(
             "kind = \"{kind}\"\noutput = \"{output}\"\ninclude_file_names = {include_file_names}"
-        )
+        );
+
+        let exclusions = "\n\n[excludes]\nextensions = []\ndirs = []";
+
+        raw_config.push_str(&header_row);
+        raw_config.push_str(exclusions);
+
+        raw_config
     }
 }
 
@@ -27,6 +38,8 @@ impl Default for ContextConfiguration {
             kind: Default::default(),
             output: PathBuf::from("."),
             include_file_names: true,
+            excluded_filetypes: Vec::new(),
+            excluded_directories: Vec::new(),
         }
     }
 }
@@ -58,4 +71,11 @@ pub struct ConfigurationTomlDocument {
     pub kind: Option<String>,
     pub output: Option<PathBuf>,
     pub include_file_names: Option<bool>,
+    pub exclude: Option<ConfigurationTomlExclusion>,
+}
+
+#[derive(Debug, Clone, Deserialize, Default)]
+pub struct ConfigurationTomlExclusion {
+    pub extensions: Vec<String>,
+    pub dirs: Vec<PathBuf>,
 }

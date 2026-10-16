@@ -5,11 +5,13 @@ use crate::{
     configuration::{config_writer::ConfigWriter, context_config::ContextConfiguration},
 };
 
-pub fn execute(project_directory: PathBuf) -> Result<(), CommandError> {
+pub fn execute(project_directory: PathBuf, force: bool) -> Result<(), CommandError> {
     let default_config = ContextConfiguration::default();
 
-    ConfigWriter::write_config(default_config).map_err(|e| CommandError::WriteConfiguration {
-        path: project_directory,
-        source: e,
+    ConfigWriter::write_config(default_config, force).map_err(|e| {
+        CommandError::WriteConfiguration {
+            path: project_directory,
+            source: e,
+        }
     })
 }

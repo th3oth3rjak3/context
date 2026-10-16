@@ -19,6 +19,9 @@ pub enum CliCommand {
     Init {
         #[arg(value_name = "project-directory", default_value = ".")]
         project_directory: PathBuf,
+
+        #[arg(long, short)]
+        force: bool,
     },
 
     /// Generate the project context file.

@@ -1,3 +1,7 @@
 kind = "md"
 output = "."
 include_file_names = true
+
+[excludes]
+extensions = []
+dirs = []

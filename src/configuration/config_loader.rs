@@ -56,10 +56,14 @@ impl ConfigLoader {
 
         let include_file_names = document.include_file_names.unwrap_or(true);
 
+        let exclusions = document.exclude.unwrap_or_default();
+
         let config = ContextConfiguration {
             kind,
             output,
             include_file_names,
+            excluded_filetypes: exclusions.extensions,
+            excluded_directories: exclusions.dirs,
         };
 
         Ok(config)

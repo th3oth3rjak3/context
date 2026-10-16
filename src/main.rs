@@ -18,7 +18,10 @@ fn main() {
 
 fn run(command: CliCommand) -> Result<(), CommandError> {
     match command {
-        CliCommand::Init { project_directory } => init_command::execute(project_directory),
+        CliCommand::Init {
+            project_directory,
+            force,
+        } => init_command::execute(project_directory, force),
         CliCommand::Generate { project_directory } => generate_command::execute(project_directory),
     }
 }
