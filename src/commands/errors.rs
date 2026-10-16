@@ -10,4 +10,11 @@ pub enum CommandError {
         #[source]
         source: io::Error,
     },
+
+    #[error("Failed to write the configuration file to '{path}'\nReason: {source}")]
+    WriteConfiguration {
+        path: PathBuf,
+        #[source]
+        source: io::Error,
+    },
 }
