@@ -10,21 +10,33 @@ impl ConfigWriter {
         config_directory: impl AsRef<Path>,
         force: bool,
     ) -> io::Result<()> {
-        let config_directory = fs::canonicalize(config_directory)?;
+        let requested_directory = config_directory.as_ref();
+        let requested_directory_display = display_path(requested_directory);
+
+        let config_directory = fs::canonicalize(requested_directory).map_err(|error| {
+            io::Error::new(
+                error.kind(),
+                format!(
+                    "Cannot access configuration directory `{requested_directory_display}`: {error}"
+                ),
+            )
+        })?;
 
         if !config_directory.is_dir() {
             return Err(io::Error::new(
                 io::ErrorKind::NotADirectory,
-                "Configuration directory must be a directory.",
+                format!("Configuration path `{requested_directory_display}` is not a directory."),
             ));
         }
 
         let config_path = config_directory.join("context.toml");
 
-        if !force && config_path.exists() {
+        if config_path.exists() && !force {
             return Err(io::Error::new(
                 io::ErrorKind::AlreadyExists,
-                "context.toml already exists; use the --force flag to overwrite it.",
+                format!(
+                    "A `context.toml` file already exists in `{requested_directory_display}`.\nUse --force to overwrite it."
+                ),
             ));
         }
 
@@ -33,10 +45,19 @@ impl ConfigWriter {
         let toml_content = toml::to_string_pretty(&document).map_err(|error| {
             io::Error::new(
                 io::ErrorKind::InvalidData,
-                format!("Failed to serialize context configuration: {error}"),
+                format!("Cannot serialize default configuration: {error}"),
             )
         })?;
 
-        fs::write(config_path, toml_content)
+        fs::write(&config_path, toml_content).map_err(|error| {
+            io::Error::new(
+                error.kind(),
+                format!("Cannot write `context.toml` in `{requested_directory_display}`: {error}"),
+            )
+        })
     }
+}
+
+fn display_path(path: &Path) -> String {
+    path.to_string_lossy().replace('\\', "/")
 }

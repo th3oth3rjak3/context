@@ -14,35 +14,47 @@ impl FileGatherer {
         let config_dir = config.config_path.parent().ok_or_else(|| {
             io::Error::new(
                 io::ErrorKind::InvalidInput,
-                "Configuration path must have a parent directory.",
+                "The loaded configuration does not have a parent directory.",
             )
         })?;
 
-        let config_dir = fs::canonicalize(config_dir)?;
+        let config_dir = fs::canonicalize(config_dir).map_err(|error| {
+            io::Error::new(
+                error.kind(),
+                format!("Cannot access the directory containing `context.toml`: {error}"),
+            )
+        })?;
 
         let generated_context_file = Self::generated_context_file(config, &config_dir);
 
-        let include_patterns = Self::compile_patterns(&config.include_patterns)?;
-        let exclude_patterns = Self::compile_patterns(&config.exclude_patterns)?;
+        let include_patterns = Self::compile_patterns("includes", &config.include_patterns)?;
+        let exclude_patterns = Self::compile_patterns("excludes", &config.exclude_patterns)?;
 
         let mut files = Vec::new();
 
         for configured_root in &config.roots {
+            let root_display = display_configured_root(configured_root);
+
             let requested_root = if configured_root.is_absolute() {
                 configured_root.clone()
             } else {
                 config_dir.join(configured_root)
             };
 
-            let scan_root = fs::canonicalize(&requested_root)?;
+            let scan_root = fs::canonicalize(&requested_root).map_err(|error| {
+                let message = if error.kind() == io::ErrorKind::NotFound {
+                    format!("Configured root `{root_display}` does not exist.")
+                } else {
+                    format!("Cannot access configured root `{root_display}`: {error}")
+                };
+
+                io::Error::new(error.kind(), message)
+            })?;
 
             if !scan_root.is_dir() {
                 return Err(io::Error::new(
                     io::ErrorKind::NotADirectory,
-                    format!(
-                        "Configured root `{}` must be a directory.",
-                        requested_root.display()
-                    ),
+                    format!("Configured root `{root_display}` is not a directory."),
                 ));
             }
 
@@ -61,7 +73,7 @@ impl FileGatherer {
     }
 
     fn gather_directory(
-        root_dir: &Path,
+        config_root: &Path,
         current_dir: &Path,
         generated_context_file: &Path,
         include_patterns: &GlobSet,
@@ -69,8 +81,27 @@ impl FileGatherer {
         has_include_patterns: bool,
         files: &mut Vec<PathBuf>,
     ) -> io::Result<()> {
-        let mut entries: Vec<fs::DirEntry> =
-            fs::read_dir(current_dir)?.collect::<Result<Vec<_>, io::Error>>()?;
+        let current_dir_display = display_relative_path(config_root, current_dir);
+
+        let read_dir = fs::read_dir(current_dir).map_err(|error| {
+            io::Error::new(
+                error.kind(),
+                format!("Cannot read directory `{current_dir_display}`: {error}"),
+            )
+        })?;
+
+        let mut entries = Vec::new();
+
+        for entry in read_dir {
+            let entry = entry.map_err(|error| {
+                io::Error::new(
+                    error.kind(),
+                    format!("Cannot read an entry in `{current_dir_display}`: {error}"),
+                )
+            })?;
+
+            entries.push(entry);
+        }
 
         entries.sort_by_key(|entry| entry.file_name());
 
@@ -81,21 +112,28 @@ impl FileGatherer {
                 continue;
             }
 
-            let file_type = entry.file_type()?;
+            let path_display = display_relative_path(config_root, &path);
 
-            // Do not follow symlinks. This avoids loops and prevents a scan
+            let file_type = entry.file_type().map_err(|error| {
+                io::Error::new(
+                    error.kind(),
+                    format!("Cannot inspect `{path_display}`: {error}"),
+                )
+            })?;
+
+            // Do not follow symlinks. This avoids loops and prevents scans
             // from unexpectedly leaving the configured project tree.
             if file_type.is_symlink() {
                 continue;
             }
 
             if file_type.is_dir() {
-                if Self::should_skip_directory(exclude_patterns, root_dir, &path)? {
+                if Self::should_skip_directory(exclude_patterns, config_root, &path) {
                     continue;
                 }
 
                 Self::gather_directory(
-                    root_dir,
+                    config_root,
                     &path,
                     generated_context_file,
                     include_patterns,
@@ -108,9 +146,9 @@ impl FileGatherer {
                     include_patterns,
                     exclude_patterns,
                     has_include_patterns,
-                    root_dir,
+                    config_root,
                     &path,
-                )?
+                )
             {
                 files.push(path);
             }
@@ -121,53 +159,40 @@ impl FileGatherer {
 
     fn should_skip_directory(
         exclude_patterns: &GlobSet,
-        root_dir: &Path,
+        config_root: &Path,
         directory: &Path,
-    ) -> io::Result<bool> {
-        Self::matches(exclude_patterns, root_dir, directory)
+    ) -> bool {
+        Self::matches(exclude_patterns, config_root, directory)
     }
 
     fn should_skip_file(
         include_patterns: &GlobSet,
         exclude_patterns: &GlobSet,
         has_include_patterns: bool,
-        root_dir: &Path,
+        config_root: &Path,
         file: &Path,
-    ) -> io::Result<bool> {
-        if Self::matches(exclude_patterns, root_dir, file)? {
-            return Ok(true);
+    ) -> bool {
+        if Self::matches(exclude_patterns, config_root, file) {
+            return true;
         }
 
-        if has_include_patterns && !Self::matches(include_patterns, root_dir, file)? {
-            return Ok(true);
-        }
-
-        Ok(false)
+        has_include_patterns && !Self::matches(include_patterns, config_root, file)
     }
 
-    fn matches(patterns: &GlobSet, root_dir: &Path, path: &Path) -> io::Result<bool> {
-        let relative_path = path.strip_prefix(root_dir).map_err(|error| {
-            io::Error::new(
-                io::ErrorKind::InvalidInput,
-                format!(
-                    "Failed to make path `{}` relative to configuration directory `{}`: {error}",
-                    path.display(),
-                    root_dir.display(),
-                ),
-            )
-        })?;
+    fn matches(patterns: &GlobSet, config_root: &Path, path: &Path) -> bool {
+        let relative_path = path.strip_prefix(config_root).unwrap_or(path);
 
-        Ok(patterns.is_match(relative_path))
+        patterns.is_match(relative_path)
     }
 
-    fn compile_patterns(patterns: &[String]) -> io::Result<GlobSet> {
+    fn compile_patterns(section: &str, patterns: &[String]) -> io::Result<GlobSet> {
         let mut builder = GlobSetBuilder::new();
 
         for pattern in patterns {
             let glob = Glob::new(pattern).map_err(|error| {
                 io::Error::new(
                     io::ErrorKind::InvalidData,
-                    format!("Invalid file pattern `{pattern}`: {error}"),
+                    format!("Invalid pattern `{pattern}` in [{section}].patterns: {error}"),
                 )
             })?;
 
@@ -177,7 +202,7 @@ impl FileGatherer {
         builder.build().map_err(|error| {
             io::Error::new(
                 io::ErrorKind::InvalidData,
-                format!("Failed to compile file patterns: {error}"),
+                format!("Cannot compile [{section}].patterns: {error}"),
             )
         })
     }
@@ -191,9 +216,29 @@ impl FileGatherer {
 
         let output_path = output_dir.join(format!("{}.{}", config.name, config.kind));
 
-        // The file may not exist yet on the first run. If it does exist,
-        // canonicalize it so it matches gathered paths.
         fs::canonicalize(&output_path).unwrap_or(output_path)
+    }
+}
+
+fn display_configured_root(root: &Path) -> String {
+    let display = root.to_string_lossy().replace('\\', "/");
+
+    if display.is_empty() {
+        ".".to_owned()
+    } else {
+        display
+    }
+}
+
+fn display_relative_path(root: &Path, path: &Path) -> String {
+    let relative_path = path.strip_prefix(root).unwrap_or(path);
+
+    let display = relative_path.to_string_lossy().replace('\\', "/");
+
+    if display.is_empty() {
+        ".".to_owned()
+    } else {
+        display
     }
 }
 

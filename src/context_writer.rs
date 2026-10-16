@@ -16,11 +16,16 @@ impl ContextWriter {
         let config_root = config.config_path.parent().ok_or_else(|| {
             io::Error::new(
                 io::ErrorKind::InvalidInput,
-                "Configuration path must have a parent directory.",
+                "The loaded configuration does not have a parent directory.",
             )
         })?;
 
-        let config_root = fs::canonicalize(config_root)?;
+        let config_root = fs::canonicalize(config_root).map_err(|error| {
+            io::Error::new(
+                error.kind(),
+                format!("Cannot access the directory containing `context.toml`: {error}"),
+            )
+        })?;
 
         let requested_output_dir = if config.output.is_absolute() {
             config.output.clone()
@@ -28,26 +33,47 @@ impl ContextWriter {
             config_root.join(&config.output)
         };
 
+        let output_directory_display = display_relative_path(&config_root, &requested_output_dir);
+
         if requested_output_dir.exists() && !requested_output_dir.is_dir() {
             return Err(io::Error::new(
                 io::ErrorKind::NotADirectory,
                 format!(
-                    "Context output path `{}` exists but is not a directory.",
-                    requested_output_dir.display()
+                    "Context output path `{output_directory_display}` exists but is not a directory."
                 ),
             ));
         }
 
-        fs::create_dir_all(&requested_output_dir)?;
+        fs::create_dir_all(&requested_output_dir).map_err(|error| {
+            io::Error::new(
+                error.kind(),
+                format!(
+                    "Cannot create context output directory `{output_directory_display}`: {error}"
+                ),
+            )
+        })?;
 
-        let output_dir = fs::canonicalize(&requested_output_dir)?;
+        let output_dir = fs::canonicalize(&requested_output_dir).map_err(|error| {
+            io::Error::new(
+                error.kind(),
+                format!(
+                    "Cannot access context output directory `{output_directory_display}`: {error}"
+                ),
+            )
+        })?;
+
         let output_path = output_dir.join(format!("{}.{}", config.name, config.kind));
 
-        let output_display_path = output_path
-            .strip_prefix(&config_root)
-            .unwrap_or(&output_path)
-            .to_string_lossy()
-            .replace('\\', "/");
+        let output_display_path = display_relative_path(&config_root, &output_path);
+
+        if output_path.is_dir() {
+            return Err(io::Error::new(
+                io::ErrorKind::AlreadyExists,
+                format!(
+                    "Cannot write context file `{output_display_path}` because a directory exists at that path."
+                ),
+            ));
+        }
 
         if output_path.exists() && !force {
             return Err(io::Error::new(
@@ -67,7 +93,12 @@ impl ContextWriter {
             context.push_str(&file_context);
         }
 
-        fs::write(output_path, context)
+        fs::write(&output_path, context).map_err(|error| {
+            io::Error::new(
+                error.kind(),
+                format!("Cannot write context file `{output_display_path}`: {error}"),
+            )
+        })
     }
 
     fn render_file(
@@ -76,25 +107,17 @@ impl ContextWriter {
         config_root: &Path,
         file: &Path,
     ) -> io::Result<String> {
+        let display_path = display_relative_path(config_root, file);
+
         let contents = fs::read_to_string(file).map_err(|error| {
-            io::Error::new(
-                error.kind(),
-                format!("Failed to read source file `{}`: {error}", file.display()),
-            )
-        })?;
+            let message = if error.kind() == io::ErrorKind::InvalidData {
+                format!("Cannot read `{display_path}` because it is not valid UTF-8 text.")
+            } else {
+                format!("Cannot read `{display_path}`: {error}")
+            };
 
-        let relative_path = file.strip_prefix(config_root).map_err(|error| {
-            io::Error::new(
-                io::ErrorKind::InvalidInput,
-                format!(
-                    "Failed to make source file `{}` relative to configuration root `{}`: {error}",
-                    file.display(),
-                    config_root.display(),
-                ),
-            )
+            io::Error::new(error.kind(), message)
         })?;
-
-        let display_path = relative_path.to_string_lossy().replace('\\', "/");
 
         match kind {
             ContextOutputKind::Markdown => Ok(Self::render_markdown_file(
@@ -183,5 +206,17 @@ impl ContextWriter {
         }
 
         "`".repeat(longest_run.max(2) + 1)
+    }
+}
+
+fn display_relative_path(root: &Path, path: &Path) -> String {
+    let relative_path = path.strip_prefix(root).unwrap_or(path);
+
+    let display = relative_path.to_string_lossy().replace('\\', "/");
+
+    if display.is_empty() {
+        ".".to_owned()
+    } else {
+        display
     }
 }
