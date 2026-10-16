@@ -4,5 +4,5 @@ output = "."
 include_file_names = true
 
 [excludes]
-extensions = []
-dirs = []
+extensions = [".dll", ".exe"]
+dirs = ["bin", "obj", "target", "node_modules", ".vscode", ".vs"]

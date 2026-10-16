@@ -14,6 +14,7 @@ pub struct ContextConfiguration {
 
 impl ContextConfiguration {
     pub fn raw(&self) -> String {
+        let name = &self.name;
         let kind = self.kind.display();
         let output = self.output.display();
         let include_file_names = self.include_file_names;
@@ -21,10 +22,17 @@ impl ContextConfiguration {
         let mut raw_config = String::new();
 
         let header_row = format!(
-            "kind = \"{kind}\"\noutput = \"{output}\"\ninclude_file_names = {include_file_names}"
+            r#"name = "{name}"
+kind = "{kind}"
+output = "{output}"
+include_file_names = {include_file_names}"#
         );
 
-        let exclusions = "\n\n[excludes]\nextensions = []\ndirs = []";
+        let exclusions = r#"
+
+[excludes]
+extensions = [".dll", ".exe"]
+dirs = ["bin", "obj", "target", "node_modules", ".vscode", ".vs"]"#;
 
         raw_config.push_str(&header_row);
         raw_config.push_str(exclusions);
