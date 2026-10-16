@@ -26,10 +26,13 @@ pub enum CliCommand {
         force: bool,
     },
 
+    /// List the files that would be included in the output context.
+    List,
+
     /// Generate the project context file.
     Generate {
-        /// The directory where the context should be written.
-        #[arg(value_name = "project-directory", default_value = ".")]
-        project_directory: PathBuf,
+        /// Overwrite the generated context file if one already exists.
+        #[arg(long, short)]
+        force: bool,
     },
 }

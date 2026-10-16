@@ -1,15 +1,26 @@
 use std::path::PathBuf;
 
-use crate::{CommandError, configuration::config_loader::ConfigLoader};
+use crate::{
+    CommandError, configuration::config_loader::ConfigLoader, context_writer::ContextWriter,
+    gatherer::FileGatherer,
+};
 
-pub fn execute(project_directory: PathBuf) -> Result<(), CommandError> {
-    let config =
-        ConfigLoader::load(&project_directory).map_err(|err| CommandError::LoadConfiguration {
-            path: project_directory.clone(),
-            source: err,
-        })?;
+pub fn execute(force: bool) -> Result<(), CommandError> {
+    let dir = PathBuf::from(".");
 
-    println!("{:?}", config);
+    let config = ConfigLoader::load(&dir)
+        .map_err(|source| CommandError::LoadConfiguration { path: dir, source })?;
+
+    let included_files = FileGatherer::gather_included_files(&config)
+        .map_err(|source| CommandError::GatherFiles { source })?;
+
+    if included_files.is_empty() {
+        println!("No files matched the current configuration.");
+        return Ok(());
+    }
+
+    ContextWriter::write(&config, &included_files, force)
+        .map_err(|source| CommandError::WriteContext { source })?;
 
     Ok(())
 }

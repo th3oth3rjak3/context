@@ -17,4 +17,16 @@ pub enum CommandError {
         #[source]
         source: io::Error,
     },
+
+    #[error("Failed to gather file paths for the configuration.\nReason: {source}")]
+    GatherFiles {
+        #[source]
+        source: io::Error,
+    },
+
+    #[error("Failed to write generated context output.\nReason: {source}")]
+    WriteContext {
+        #[source]
+        source: io::Error,
+    },
 }

@@ -1,55 +1,43 @@
 use std::{fmt::Display, path::PathBuf};
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone)]
 pub struct ContextConfiguration {
     pub name: String,
     pub kind: ContextOutputKind,
     pub output: PathBuf,
+    pub roots: Vec<PathBuf>,
     pub include_file_names: bool,
-    pub excluded_filetypes: Vec<String>,
-    pub excluded_directories: Vec<PathBuf>,
-}
-
-impl ContextConfiguration {
-    pub fn raw(&self) -> String {
-        let name = &self.name;
-        let kind = self.kind.display();
-        let output = self.output.display();
-        let include_file_names = self.include_file_names;
-
-        let mut raw_config = String::new();
-
-        let header_row = format!(
-            r#"name = "{name}"
-kind = "{kind}"
-output = "{output}"
-include_file_names = {include_file_names}"#
-        );
-
-        let exclusions = r#"
-
-[excludes]
-extensions = [".dll", ".exe"]
-dirs = ["bin", "obj", "target", "node_modules", ".vscode", ".vs"]"#;
-
-        raw_config.push_str(&header_row);
-        raw_config.push_str(exclusions);
-
-        raw_config
-    }
+    pub include_patterns: Vec<String>,
+    pub exclude_patterns: Vec<String>,
+    pub config_path: PathBuf,
 }
 
 impl Default for ContextConfiguration {
     fn default() -> Self {
         Self {
             name: "context".into(),
-            kind: Default::default(),
+            kind: ContextOutputKind::Markdown,
             output: PathBuf::from("."),
+            roots: vec![PathBuf::from(".")],
             include_file_names: true,
-            excluded_filetypes: Vec::new(),
-            excluded_directories: Vec::new(),
+            include_patterns: Vec::new(),
+            exclude_patterns: vec![
+                "**/.git".into(),
+                "**/.gitignore".into(),
+                "**/.env".into(),
+                "**/*.dll".into(),
+                "**/*.exe".into(),
+                "**/*.so".into(),
+                "**/*.dylib".into(),
+                "**/*.o".into(),
+                "**/*.obj".into(),
+                "**/*.a".into(),
+                "**/*.lib".into(),
+                "**/context.toml".into(),
+            ],
+            config_path: PathBuf::from(".").join("context.toml"),
         }
     }
 }
@@ -76,17 +64,52 @@ impl Display for ContextOutputKind {
     }
 }
 
-#[derive(Debug, Clone, Deserialize)]
+impl From<&ContextConfiguration> for ConfigurationTomlDocument {
+    fn from(config: &ContextConfiguration) -> Self {
+        Self {
+            name: Some(config.name.clone()),
+            kind: Some(config.kind.to_string()),
+            output: Some(config.output.clone()),
+            include_file_names: Some(config.include_file_names),
+
+            roots: config.roots.clone(),
+
+            includes: ConfigurationTomlPatterns {
+                patterns: config.include_patterns.clone(),
+            },
+
+            excludes: ConfigurationTomlPatterns {
+                patterns: config.exclude_patterns.clone(),
+            },
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ConfigurationTomlDocument {
     pub name: Option<String>,
     pub kind: Option<String>,
     pub output: Option<PathBuf>,
     pub include_file_names: Option<bool>,
-    pub exclude: Option<ConfigurationTomlExclusion>,
+
+    #[serde(default = "default_roots")]
+    pub roots: Vec<PathBuf>,
+
+    #[serde(default)]
+    pub includes: ConfigurationTomlPatterns,
+
+    #[serde(default)]
+    pub excludes: ConfigurationTomlPatterns,
 }
 
-#[derive(Debug, Clone, Deserialize, Default)]
-pub struct ConfigurationTomlExclusion {
-    pub extensions: Vec<String>,
-    pub dirs: Vec<PathBuf>,
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ConfigurationTomlPatterns {
+    #[serde(default)]
+    pub patterns: Vec<String>,
+}
+
+fn default_roots() -> Vec<PathBuf> {
+    vec![PathBuf::from(".")]
 }

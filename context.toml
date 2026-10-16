@@ -2,7 +2,26 @@ name = "context"
 kind = "md"
 output = "."
 include_file_names = true
+roots = ["."]
+
+[includes]
+patterns = []
 
 [excludes]
-extensions = [".dll", ".exe"]
-dirs = ["bin", "obj", "target", "node_modules", ".vscode", ".vs"]
+patterns = [
+    "**/.git",
+    "**/.gitignore",
+    "**/.env",
+    "**/*.dll",
+    "**/*.exe",
+    "**/*.so",
+    "**/*.dylib",
+    "**/*.o",
+    "**/*.obj",
+    "**/*.a",
+    "**/*.lib",
+    "**/context.toml",
+    "**/target",
+    "**/Cargo.lock",
+    "**/.cargo",
+]
