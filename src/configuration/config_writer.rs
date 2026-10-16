@@ -1,23 +1,27 @@
-use std::{fs, io};
+use std::{fs, io, path::Path};
 
 use crate::configuration::context_config::{ConfigurationTomlDocument, ContextConfiguration};
 
 pub struct ConfigWriter;
 
 impl ConfigWriter {
-    pub fn write_config(config: &ContextConfiguration, force: bool) -> io::Result<()> {
-        let output = fs::canonicalize(&config.output)?;
+    pub fn write_config(
+        config: &ContextConfiguration,
+        config_directory: impl AsRef<Path>,
+        force: bool,
+    ) -> io::Result<()> {
+        let config_directory = fs::canonicalize(config_directory)?;
 
-        if !output.is_dir() {
+        if !config_directory.is_dir() {
             return Err(io::Error::new(
                 io::ErrorKind::NotADirectory,
-                "Configuration output must be a directory.",
+                "Configuration directory must be a directory.",
             ));
         }
 
-        let config_output = output.join("context.toml");
+        let config_path = config_directory.join("context.toml");
 
-        if !force && config_output.exists() {
+        if !force && config_path.exists() {
             return Err(io::Error::new(
                 io::ErrorKind::AlreadyExists,
                 "context.toml already exists; use the --force flag to overwrite it.",
@@ -33,6 +37,6 @@ impl ConfigWriter {
             )
         })?;
 
-        fs::write(config_output, toml_content)
+        fs::write(config_path, toml_content)
     }
 }

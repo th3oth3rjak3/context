@@ -20,6 +20,8 @@ impl FileGatherer {
 
         let config_dir = fs::canonicalize(config_dir)?;
 
+        let generated_context_file = Self::generated_context_file(config, &config_dir);
+
         let include_patterns = Self::compile_patterns(&config.include_patterns)?;
         let exclude_patterns = Self::compile_patterns(&config.exclude_patterns)?;
 
@@ -47,6 +49,7 @@ impl FileGatherer {
             Self::gather_directory(
                 &config_dir,
                 &scan_root,
+                &generated_context_file,
                 &include_patterns,
                 &exclude_patterns,
                 !config.include_patterns.is_empty(),
@@ -60,6 +63,7 @@ impl FileGatherer {
     fn gather_directory(
         root_dir: &Path,
         current_dir: &Path,
+        generated_context_file: &Path,
         include_patterns: &GlobSet,
         exclude_patterns: &GlobSet,
         has_include_patterns: bool,
@@ -72,6 +76,11 @@ impl FileGatherer {
 
         for entry in entries {
             let path = entry.path();
+
+            if path == generated_context_file {
+                continue;
+            }
+
             let file_type = entry.file_type()?;
 
             // Do not follow symlinks. This avoids loops and prevents a scan
@@ -88,6 +97,7 @@ impl FileGatherer {
                 Self::gather_directory(
                     root_dir,
                     &path,
+                    generated_context_file,
                     include_patterns,
                     exclude_patterns,
                     has_include_patterns,
@@ -170,6 +180,20 @@ impl FileGatherer {
                 format!("Failed to compile file patterns: {error}"),
             )
         })
+    }
+
+    fn generated_context_file(config: &ContextConfiguration, config_root: &Path) -> PathBuf {
+        let output_dir = if config.output.is_absolute() {
+            config.output.clone()
+        } else {
+            config_root.join(&config.output)
+        };
+
+        let output_path = output_dir.join(format!("{}.{}", config.name, config.kind));
+
+        // The file may not exist yet on the first run. If it does exist,
+        // canonicalize it so it matches gathered paths.
+        fs::canonicalize(&output_path).unwrap_or(output_path)
     }
 }
 
@@ -372,5 +396,23 @@ mod tests {
             .expect_err("A configured root file should return an error");
 
         assert_eq!(error.kind(), io::ErrorKind::NotADirectory);
+    }
+
+    #[test]
+    fn excludes_the_generated_context_file() {
+        let directory = TempDir::new().unwrap();
+
+        write_file(directory.path().join("src").join("main.rs"));
+        write_file(directory.path().join("context").join("context.md"));
+
+        let mut config = config(&directory);
+        config.output = PathBuf::from("context");
+
+        let files = FileGatherer::gather_included_files(&config).unwrap();
+
+        assert_eq!(
+            relative_paths(directory.path(), &files),
+            vec![PathBuf::from("src").join("main.rs")]
+        );
     }
 }

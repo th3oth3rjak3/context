@@ -13,7 +13,7 @@ pub mod gatherer;
 fn main() {
     let cli = Cli::parse();
     if let Err(e) = run(cli.command) {
-        eprintln!("Unexpected Error: {e}");
+        eprintln!("{e}");
         std::process::exit(1);
     }
 }

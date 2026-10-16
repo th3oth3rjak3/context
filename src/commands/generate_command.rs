@@ -8,8 +8,8 @@ use crate::{
 pub fn execute(force: bool) -> Result<(), CommandError> {
     let dir = PathBuf::from(".");
 
-    let config = ConfigLoader::load(&dir)
-        .map_err(|source| CommandError::LoadConfiguration { path: dir, source })?;
+    let config =
+        ConfigLoader::load(&dir).map_err(|source| CommandError::LoadConfiguration { source })?;
 
     let included_files = FileGatherer::gather_included_files(&config)
         .map_err(|source| CommandError::GatherFiles { source })?;

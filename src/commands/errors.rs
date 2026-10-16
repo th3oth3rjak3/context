@@ -1,30 +1,28 @@
-use std::{io, path::PathBuf};
+use std::io;
 
 use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum CommandError {
-    #[error("Failed to load configuration for context '{path}'\nReason: {source}")]
+    #[error("{source}")]
     LoadConfiguration {
-        path: PathBuf,
         #[source]
         source: io::Error,
     },
 
-    #[error("Failed to write the configuration file to '{path}'\nReason: {source}")]
+    #[error("{source}")]
     WriteConfiguration {
-        path: PathBuf,
         #[source]
         source: io::Error,
     },
 
-    #[error("Failed to gather file paths for the configuration.\nReason: {source}")]
+    #[error("{source}")]
     GatherFiles {
         #[source]
         source: io::Error,
     },
 
-    #[error("Failed to write generated context output.\nReason: {source}")]
+    #[error("{source}")]
     WriteContext {
         #[source]
         source: io::Error,

@@ -12,22 +12,37 @@ pub struct ConfigLoader;
 
 impl ConfigLoader {
     pub fn load(project_path: impl AsRef<Path>) -> io::Result<ContextConfiguration> {
-        let full_project_path = fs::canonicalize(project_path)?;
+        let requested_path = project_path.as_ref();
+
+        let full_project_path = fs::canonicalize(requested_path).map_err(|error| {
+            io::Error::new(
+                error.kind(),
+                format!(
+                    "Cannot access project directory `{}`: {error}",
+                    requested_path.display()
+                ),
+            )
+        })?;
 
         let config_path = Self::get_config_path(&full_project_path).ok_or_else(|| {
             io::Error::new(
                 io::ErrorKind::NotFound,
-                "Could not find a context.toml file in the directory provided or any of its ancestors",
+                format!(
+                    "No context.toml was found in `{}` or its parent directories.",
+                    requested_path.display()
+                ),
             )
         })?;
 
         let config_path = fs::canonicalize(config_path)?;
-        let text = fs::read_to_string(&config_path)?;
+        let text = fs::read_to_string(&config_path).map_err(|error| {
+            io::Error::new(error.kind(), format!("Cannot read `context.toml`: {error}"))
+        })?;
 
         let document: ConfigurationTomlDocument = toml::from_str(&text).map_err(|error| {
             io::Error::new(
                 io::ErrorKind::InvalidData,
-                format!("Failed to parse context configuration: {error}"),
+                format!("Invalid `context.toml`: {error}"),
             )
         })?;
 
@@ -44,7 +59,7 @@ impl ConfigLoader {
         let name = name.ok_or_else(|| {
             io::Error::new(
                 io::ErrorKind::InvalidData,
-                "Configuration must contain a name",
+                "`context.toml` is missing required field `name`.",
             )
         })?;
 
@@ -62,7 +77,7 @@ impl ConfigLoader {
             _ => {
                 return Err(io::Error::new(
                     io::ErrorKind::InvalidData,
-                    "Output kind must be one of: 'md', 'markdown', 'txt', or 'text'",
+                    "`context.toml` field `kind` must be one of: md, markdown, txt, or text.",
                 ));
             }
         };
@@ -70,7 +85,7 @@ impl ConfigLoader {
         let output = output.ok_or_else(|| {
             io::Error::new(
                 io::ErrorKind::InvalidData,
-                "Output directory is required in order to produce your context.",
+                "`context.toml` is missing required field `output`.",
             )
         })?;
 
@@ -232,7 +247,10 @@ output = "."
         let error = result.expect_err("Expected missing name error");
 
         assert_eq!(error.kind(), io::ErrorKind::InvalidData);
-        assert_eq!(error.to_string(), "Configuration must contain a name");
+        assert_eq!(
+            error.to_string(),
+            "`context.toml` is missing required field `name`."
+        );
     }
 
     #[test]
@@ -264,7 +282,7 @@ output = "."
         assert_eq!(error.kind(), io::ErrorKind::InvalidData);
         assert_eq!(
             error.to_string(),
-            "Output kind must be one of: 'md', 'markdown', 'txt', or 'text'"
+            "`context.toml` field `kind` must be one of: md, markdown, txt, or text."
         );
     }
 
@@ -282,7 +300,7 @@ kind = "md"
         assert_eq!(error.kind(), io::ErrorKind::InvalidData);
         assert_eq!(
             error.to_string(),
-            "Output directory is required in order to produce your context."
+            "`context.toml` is missing required field `output`."
         );
     }
 

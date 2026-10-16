@@ -8,10 +8,6 @@ use crate::{
 pub fn execute(project_directory: PathBuf, force: bool) -> Result<(), CommandError> {
     let default_config = ContextConfiguration::default();
 
-    ConfigWriter::write_config(&default_config, force).map_err(|e| {
-        CommandError::WriteConfiguration {
-            path: project_directory,
-            source: e,
-        }
-    })
+    ConfigWriter::write_config(&default_config, &project_directory, force)
+        .map_err(|source| CommandError::WriteConfiguration { source })
 }
