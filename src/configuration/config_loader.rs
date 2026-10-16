@@ -31,6 +31,14 @@ impl ConfigLoader {
             )
         })?;
 
+        let name = match document.name {
+            Some(name) => Ok(name),
+            None => Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "Configuration must contain a name",
+            )),
+        }?;
+
         let kind = match document
             .kind
             .map(|kind| kind.to_ascii_lowercase())
@@ -59,6 +67,7 @@ impl ConfigLoader {
         let exclusions = document.exclude.unwrap_or_default();
 
         let config = ContextConfiguration {
+            name,
             kind,
             output,
             include_file_names,

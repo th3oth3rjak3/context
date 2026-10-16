@@ -4,6 +4,7 @@ use serde::Deserialize;
 
 #[derive(Debug, Clone)]
 pub struct ContextConfiguration {
+    pub name: String,
     pub kind: ContextOutputKind,
     pub output: PathBuf,
     pub include_file_names: bool,
@@ -35,6 +36,7 @@ impl ContextConfiguration {
 impl Default for ContextConfiguration {
     fn default() -> Self {
         Self {
+            name: "context".into(),
             kind: Default::default(),
             output: PathBuf::from("."),
             include_file_names: true,
@@ -68,6 +70,7 @@ impl Display for ContextOutputKind {
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct ConfigurationTomlDocument {
+    pub name: Option<String>,
     pub kind: Option<String>,
     pub output: Option<PathBuf>,
     pub include_file_names: Option<bool>,

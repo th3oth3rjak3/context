@@ -17,15 +17,18 @@ pub struct Cli {
 pub enum CliCommand {
     /// Initialize a new context configuration.
     Init {
+        /// The directory where the config file should be placed.
         #[arg(value_name = "project-directory", default_value = ".")]
         project_directory: PathBuf,
 
+        /// Overwrite an existing config file if one already exists.
         #[arg(long, short)]
         force: bool,
     },
 
     /// Generate the project context file.
     Generate {
+        /// The directory where the context should be written.
         #[arg(value_name = "project-directory", default_value = ".")]
         project_directory: PathBuf,
     },
