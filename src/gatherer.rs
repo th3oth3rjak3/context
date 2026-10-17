@@ -253,7 +253,7 @@ mod tests {
     use tempfile::TempDir;
 
     fn config(directory: &TempDir) -> ContextConfiguration {
-        let mut config = ContextConfiguration::default();
+        let mut config = ContextConfiguration::new();
 
         config.config_path = fs::canonicalize(directory.path())
             .unwrap()

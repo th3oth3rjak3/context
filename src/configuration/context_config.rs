@@ -14,6 +14,12 @@ pub struct ContextConfiguration {
     pub config_path: PathBuf,
 }
 
+impl ContextConfiguration {
+    pub fn new() -> Self {
+        Self::default()
+    }
+}
+
 impl Default for ContextConfiguration {
     fn default() -> Self {
         Self {
