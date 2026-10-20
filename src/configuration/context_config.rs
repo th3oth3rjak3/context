@@ -41,6 +41,8 @@ impl Default for ContextConfiguration {
                 "**/*.obj".into(),
                 "**/*.a".into(),
                 "**/*.lib".into(),
+                "**/bin".into(),
+                "**/obj".into(),
                 "**/context.toml".into(),
             ],
             config_path: PathBuf::from(".").join("context.toml"),
