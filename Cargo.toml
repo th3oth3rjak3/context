@@ -7,11 +7,13 @@ edition = "2024"
 name = "ctx"
 path = "src/main.rs"
 
+[dev-dependencies]
+rstest = "0.27.0"
+tempfile = "3.27.0"
+
 [dependencies]
 clap = { version = "4.6.7", features = ["derive"] }
 globset = { version = "0.4.20", features = ["serde"] }
-rstest = "0.27.0"
 serde = { version = "1.0.229", features = ["derive"] }
-tempfile = "3.27.0"
 thiserror = "2.0.21"
 toml = "1.1.8"

@@ -1,2 +1,2 @@
 [alias]
-context = "run -p context --"
+ctx = "run -p context --"
